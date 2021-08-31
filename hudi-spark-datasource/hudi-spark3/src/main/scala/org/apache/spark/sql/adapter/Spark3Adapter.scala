@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.adapter
 
+import org.apache.avro.Schema
 import org.apache.hudi.Spark3RowSerDe
 import org.apache.hudi.client.utils.SparkRowSerDe
 import org.apache.spark.sql.Row
@@ -25,11 +26,14 @@ import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.{Expression, Like}
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical.{InsertIntoStatement, Join, JoinHint, LogicalPlan}
-import org.apache.spark.sql.catalyst.{AliasIdentifier, TableIdentifier}
+import org.apache.spark.sql.catalyst.{AliasIdentifier, NoopFilters, TableIdentifier}
 import org.apache.spark.sql.connector.catalog.CatalogV2Implicits._
 import org.apache.spark.sql.execution.datasources.{Spark3ParsePartitionUtil, SparkParsePartitionUtil}
 import org.apache.spark.sql.hudi.SparkAdapter
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.internal.SQLConf.LegacyBehaviorPolicy
+import org.apache.spark.sql.types.{DataType, StructType}
+import org.apache.spark.sql.hudi.SparkAdapter.{AvroDeserializer, AvroSerializer}
 
 /**
  * The adapter for spark3.
@@ -67,7 +71,7 @@ class Spark3Adapter extends SparkAdapter {
   override def getInsertIntoChildren(plan: LogicalPlan):
     Option[(LogicalPlan, Map[String, Option[String]], LogicalPlan, Boolean, Boolean)] = {
     plan match {
-      case InsertIntoStatement(table, partitionSpec, query, overwrite, ifPartitionNotExists) =>
+      case InsertIntoStatement(table, partitionSpec, _, query, overwrite, ifPartitionNotExists) =>
         Some((table, partitionSpec, query, overwrite, ifPartitionNotExists))
       case _=> None
     }
@@ -75,7 +79,7 @@ class Spark3Adapter extends SparkAdapter {
 
   override def createInsertInto(table: LogicalPlan, partition: Map[String, Option[String]],
      query: LogicalPlan, overwrite: Boolean, ifPartitionNotExists: Boolean): LogicalPlan = {
-    InsertIntoStatement(table, partition, query, overwrite, ifPartitionNotExists)
+    InsertIntoStatement(table, partition, Seq(), query, overwrite, ifPartitionNotExists)
   }
 
   override def createSparkParsePartitionUtil(conf: SQLConf): SparkParsePartitionUtil = {
@@ -84,5 +88,13 @@ class Spark3Adapter extends SparkAdapter {
 
   override def createLike(left: Expression, right: Expression): Expression = {
     new Like(left, right)
+  }
+
+  override def createAvroDeserializer(requiredAvroSchema: Schema, requiredStructSchema: StructType): AvroDeserializer = {
+    new AvroDeserializer(requiredAvroSchema, requiredStructSchema, LegacyBehaviorPolicy.withName(SQLConf.get.getConf(SQLConf.LEGACY_AVRO_REBASE_MODE_IN_READ)), new NoopFilters)
+  }
+
+  override def createAvroSerializer(requiredStructSchema: DataType, requiredAvroSchema: Schema, nullable: Boolean): AvroSerializer = {
+    new AvroSerializer(requiredStructSchema, requiredAvroSchema, nullable, LegacyBehaviorPolicy.withName(SQLConf.get.getConf(SQLConf.LEGACY_AVRO_REBASE_MODE_IN_WRITE)))
   }
 }

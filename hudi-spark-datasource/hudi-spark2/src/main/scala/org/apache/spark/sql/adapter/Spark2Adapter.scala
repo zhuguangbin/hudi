@@ -17,6 +17,7 @@
 
 package org.apache.spark.sql.adapter
 
+import org.apache.avro.Schema
 import org.apache.hudi.Spark2RowSerDe
 import org.apache.hudi.client.utils.SparkRowSerDe
 import org.apache.spark.sql.{Row, SparkSession}
@@ -29,8 +30,10 @@ import org.apache.spark.sql.catalyst.plans.logical.{InsertIntoTable, Join, Logic
 import org.apache.spark.sql.catalyst.{AliasIdentifier, TableIdentifier}
 import org.apache.spark.sql.execution.datasources.{Spark2ParsePartitionUtil, SparkParsePartitionUtil}
 import org.apache.spark.sql.hudi.SparkAdapter
+import org.apache.spark.sql.hudi.SparkAdapter.{AvroDeserializer, AvroSerializer}
 import org.apache.spark.sql.hudi.parser.HoodieSpark2ExtendedSqlParser
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.types.{DataType, StructType}
 
 /**
  * The adapter for spark2.
@@ -82,4 +85,8 @@ class Spark2Adapter extends SparkAdapter {
   override def createLike(left: Expression, right: Expression): Expression = {
     Like(left, right)
   }
+
+  override def createAvroDeserializer(requiredAvroSchema: Schema, requiredStructSchema: StructType): AvroDeserializer = new AvroDeserializer(requiredAvroSchema, requiredStructSchema)
+
+  override def createAvroSerializer(requiredStructSchema: DataType, requiredAvroSchema: Schema, nullable: Boolean): AvroSerializer = new AvroSerializer(requiredStructSchema, requiredAvroSchema, nullable)
 }
