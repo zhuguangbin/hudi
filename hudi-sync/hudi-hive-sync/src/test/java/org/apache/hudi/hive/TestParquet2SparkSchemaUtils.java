@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 public class TestParquet2SparkSchemaUtils {
   private final SparkToParquetSchemaConverter spark2ParquetConverter =
           new SparkToParquetSchemaConverter(new SQLConf());
-  private final SparkSqlParser parser = new SparkSqlParser(new SQLConf());
+  private final SparkSqlParser parser = new SparkSqlParser();
 
   @Test
   public void testConvertPrimitiveType() {

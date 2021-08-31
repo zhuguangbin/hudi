@@ -18,6 +18,7 @@
 
 package org.apache.spark.sql.hudi
 
+import org.apache.avro.Schema
 import org.apache.hudi.client.utils.SparkRowSerDe
 import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
@@ -27,7 +28,9 @@ import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan}
 import org.apache.spark.sql.catalyst.{AliasIdentifier, TableIdentifier}
 import org.apache.spark.sql.execution.datasources.SparkParsePartitionUtil
+import org.apache.spark.sql.hudi.SparkAdapter.{AvroDeserializer, AvroSerializer}
 import org.apache.spark.sql.internal.SQLConf
+import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{Row, SparkSession}
 
 /**
@@ -63,12 +66,14 @@ trait SparkAdapter extends Serializable {
 
   /**
    * Get the member of the Insert Into LogicalPlan.
+   * when InsertIntoHoodieTableCommand support userSpecifiedCols, we should expand this api
    */
   def getInsertIntoChildren(plan: LogicalPlan):
     Option[(LogicalPlan, Map[String, Option[String]], LogicalPlan, Boolean, Boolean)]
 
   /**
    * Create a Insert Into LogicalPlan.
+   * when InsertIntoHoodieTableCommand support userSpecifiedCols, we should expand this api
    */
   def createInsertInto(table: LogicalPlan, partition: Map[String, Option[String]],
     query: LogicalPlan, overwrite: Boolean, ifPartitionNotExists: Boolean): LogicalPlan
@@ -87,4 +92,21 @@ trait SparkAdapter extends Serializable {
    * Create Like expression.
    */
   def createLike(left: Expression, right: Expression): Expression
+
+  /**
+   * Create an self AvroDeserializer.
+   */
+  def createAvroDeserializer(requiredAvroSchema: Schema, requiredStructSchema: StructType): AvroDeserializer
+
+  /**
+   * Create an self AvroDeserializer.
+   */
+  def createAvroSerializer(requiredStructSchema: DataType, requiredAvroSchema: Schema, nullable: Boolean): AvroSerializer
+
+}
+
+object SparkAdapter {
+  type AvroDeserializer = org.apache.spark.sql.avro.AvroDeserializer
+
+  type AvroSerializer = org.apache.spark.sql.avro.AvroSerializer
 }
