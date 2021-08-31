@@ -122,3 +122,10 @@ mvn -Punit-tests test -DSPARK_EVLOG_DIR=/path/for/spark/event/log
 ## Quickstart
 
 Please visit [https://hudi.apache.org/docs/quick-start-guide.html](https://hudi.apache.org/docs/quick-start-guide.html) to quickly explore Hudi's capabilities using spark-shell. 
+
+## Qihoo Internal build
+
+To integrate with qihoo infra, build using the following profile
+```
+mvn clean package  -DskipTests -Pspark3 -Pflink-bundle-shade-hive2 -Pinclude-flink-sql-connector-hive
+```
