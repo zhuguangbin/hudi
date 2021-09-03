@@ -19,6 +19,7 @@
 package org.apache.spark.sql.hudi
 
 import org.apache.avro.Schema
+import org.apache.avro.generic.IndexedRecord
 import org.apache.hudi.client.utils.SparkRowSerDe
 import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
@@ -26,7 +27,7 @@ import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.parser.ParserInterface
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan}
-import org.apache.spark.sql.catalyst.{AliasIdentifier, TableIdentifier}
+import org.apache.spark.sql.catalyst.{AliasIdentifier, InternalRow, TableIdentifier}
 import org.apache.spark.sql.execution.datasources.SparkParsePartitionUtil
 import org.apache.spark.sql.hudi.SparkAdapter.{AvroDeserializer, AvroSerializer}
 import org.apache.spark.sql.internal.SQLConf
@@ -102,6 +103,8 @@ trait SparkAdapter extends Serializable {
    * Create an self AvroDeserializer.
    */
   def createAvroSerializer(requiredStructSchema: DataType, requiredAvroSchema: Schema, nullable: Boolean): AvroSerializer
+
+  def deserializeAvroToInternal(record: IndexedRecord, avroDeserializer: AvroDeserializer): Option[InternalRow]
 
 }
 
