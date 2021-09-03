@@ -18,6 +18,7 @@
 package org.apache.spark.sql.adapter
 
 import org.apache.avro.Schema
+import org.apache.avro.generic.IndexedRecord
 import org.apache.hudi.Spark3RowSerDe
 import org.apache.hudi.client.utils.SparkRowSerDe
 import org.apache.spark.sql.Row
@@ -26,7 +27,7 @@ import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
 import org.apache.spark.sql.catalyst.expressions.{Expression, Like}
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical.{InsertIntoStatement, Join, JoinHint, LogicalPlan}
-import org.apache.spark.sql.catalyst.{AliasIdentifier, NoopFilters, TableIdentifier}
+import org.apache.spark.sql.catalyst.{AliasIdentifier, InternalRow, NoopFilters, TableIdentifier}
 import org.apache.spark.sql.connector.catalog.CatalogV2Implicits._
 import org.apache.spark.sql.execution.datasources.{Spark3ParsePartitionUtil, SparkParsePartitionUtil}
 import org.apache.spark.sql.hudi.SparkAdapter
@@ -97,4 +98,6 @@ class Spark3Adapter extends SparkAdapter {
   override def createAvroSerializer(requiredStructSchema: DataType, requiredAvroSchema: Schema, nullable: Boolean): AvroSerializer = {
     new AvroSerializer(requiredStructSchema, requiredAvroSchema, nullable, LegacyBehaviorPolicy.withName(SQLConf.get.getConf(SQLConf.LEGACY_AVRO_REBASE_MODE_IN_WRITE)))
   }
+
+  override def deserializeAvroToInternal(record: IndexedRecord, avroDeserializer: AvroDeserializer): Option[InternalRow] = avroDeserializer.deserialize(record).asInstanceOf[Option[InternalRow]]
 }
