@@ -57,12 +57,8 @@ class HoodieCommonSqlParser(session: SparkSession, delegate: ParserInterface)
 
   override def parseDataType(sqlText: String): DataType = delegate.parseDataType(sqlText)
 
-  def parseRawDataType(sqlText : String) : DataType = {
-    throw new UnsupportedOperationException(s"Unsupported parseRawDataType method")
-  }
-
   def parseMultipartIdentifier(sqlText: String): Seq[String] = {
-    throw new UnsupportedOperationException(s"Unsupported parseMultipartIdentifier method")
+    delegate.parseMultipartIdentifier(sqlText)
   }
 
   protected def parse[T](command: String)(toResult: HoodieSqlCommonParser => T): T = {
