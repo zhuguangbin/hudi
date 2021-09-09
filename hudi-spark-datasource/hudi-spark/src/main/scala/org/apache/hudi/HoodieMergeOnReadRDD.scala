@@ -134,7 +134,7 @@ class HoodieMergeOnReadRDD(@transient sc: SparkContext,
           } else {
             val requiredAvroRecord = AvroConversionUtils
               .buildAvroRecordBySchema(curAvroRecord.get(), requiredAvroSchema, requiredFieldPosition, recordBuilder)
-            recordToLoad = unsafeProjection(deserializer.deserialize(requiredAvroRecord).asInstanceOf[InternalRow])
+            recordToLoad = unsafeProjection(sparkAdapter.deserializeAvroToInternal(requiredAvroRecord, deserializer).orNull)
             true
           }
         } else {
@@ -179,7 +179,7 @@ class HoodieMergeOnReadRDD(@transient sc: SparkContext,
             } else {
               val requiredAvroRecord = AvroConversionUtils
                 .buildAvroRecordBySchema(curAvroRecord.get(), requiredAvroSchema, requiredFieldPosition, recordBuilder)
-              recordToLoad = unsafeProjection(deserializer.deserialize(requiredAvroRecord).asInstanceOf[InternalRow])
+              recordToLoad = unsafeProjection(sparkAdapter.deserializeAvroToInternal(requiredAvroRecord, deserializer).orNull)
               true
             }
           } else {
@@ -234,8 +234,7 @@ class HoodieMergeOnReadRDD(@transient sc: SparkContext,
                   requiredFieldPosition,
                   recordBuilder
                 )
-              recordToLoad = unsafeProjection(requiredDeserializer
-                .deserialize(requiredAvroRecord).asInstanceOf[InternalRow])
+              recordToLoad = unsafeProjection(sparkAdapter.deserializeAvroToInternal(requiredAvroRecord, requiredDeserializer).orNull)
               true
             }
           } else {
@@ -262,8 +261,7 @@ class HoodieMergeOnReadRDD(@transient sc: SparkContext,
                     requiredFieldPosition,
                     recordBuilder
                   )
-                recordToLoad = unsafeProjection(requiredDeserializer
-                  .deserialize(requiredAvroRecord).asInstanceOf[InternalRow])
+                recordToLoad = unsafeProjection(sparkAdapter.deserializeAvroToInternal(requiredAvroRecord, requiredDeserializer).orNull)
                 true
               }
             }
