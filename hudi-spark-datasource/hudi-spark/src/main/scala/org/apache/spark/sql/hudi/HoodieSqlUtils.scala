@@ -57,7 +57,7 @@ object HoodieSqlUtils extends SparkAdapterSupport {
   def isHoodieTable(table: LogicalPlan, spark: SparkSession): Boolean = {
     tripAlias(table) match {
       case LogicalRelation(_, _, Some(tbl), _) => isHoodieTable(tbl)
-      case relation: UnresolvedRelation =>
+      case relation: UnresolvedRelation if relation.multipartIdentifier.length < 3 =>
         isHoodieTable(sparkAdapter.toTableIdentify(relation), spark)
       case _=> false
     }
