@@ -28,7 +28,6 @@ import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -83,7 +82,7 @@ public class FilePathUtils {
    * @param partitionKVs  The partition key value mapping
    * @param hivePartition Whether the partition path is with Hive style,
    *                      e.g. {partition key} = {partition value}
-   * @param sepSuffix     Whether to append the file separator as suffix
+   * @param sepSuffix     Whether to append the path separator as suffix
    * @return an escaped, valid partition name
    */
   public static String generatePartitionPath(
@@ -97,7 +96,7 @@ public class FilePathUtils {
     int i = 0;
     for (Map.Entry<String, String> e : partitionKVs.entrySet()) {
       if (i > 0) {
-        suffixBuf.append(File.separator);
+        suffixBuf.append(Path.SEPARATOR);
       }
       if (hivePartition) {
         suffixBuf.append(escapePathName(e.getKey()));
@@ -107,7 +106,7 @@ public class FilePathUtils {
       i++;
     }
     if (sepSuffix) {
-      suffixBuf.append(File.separator);
+      suffixBuf.append(Path.SEPARATOR);
     }
     return suffixBuf.toString();
   }
@@ -283,11 +282,11 @@ public class FilePathUtils {
    *
    * <p>The return list should be [{key1:val1, key2:val2, key3:val3}, {key1:val4, key2:val5, key3:val6}].
    *
-   * @param path The base path
-   * @param hadoopConf The hadoop configuration
-   * @param partitionKeys The partition key list
+   * @param path           The base path
+   * @param hadoopConf     The hadoop configuration
+   * @param partitionKeys  The partition key list
    * @param defaultParName The default partition name for nulls
-   * @param hivePartition Whether the partition path is in Hive style
+   * @param hivePartition  Whether the partition path is in Hive style
    */
   public static List<Map<String, String>> getPartitions(
       Path path,
@@ -338,9 +337,9 @@ public class FilePathUtils {
   /**
    * Returns all the file paths that is the parents of the data files.
    *
-   * @param path The base path
-   * @param conf The Flink configuration
-   * @param hadoopConf The hadoop configuration
+   * @param path          The base path
+   * @param conf          The Flink configuration
+   * @param hadoopConf    The hadoop configuration
    * @param partitionKeys The partition key list
    */
   public static Path[] getReadPaths(
@@ -362,11 +361,10 @@ public class FilePathUtils {
   /**
    * Transforms the given partition key value mapping to read paths.
    *
-   * @param path The base path
-   * @param partitionKeys The partition key list
+   * @param path           The base path
+   * @param partitionKeys  The partition key list
    * @param partitionPaths The partition key value mapping
-   * @param hivePartition Whether the partition path is in Hive style
-   *
+   * @param hivePartition  Whether the partition path is in Hive style
    * @see #getReadPaths
    */
   public static Path[] partitionPath2ReadPath(
@@ -384,10 +382,9 @@ public class FilePathUtils {
   /**
    * Transforms the given partition key value mapping to relative partition paths.
    *
-   * @param partitionKeys The partition key list
+   * @param partitionKeys  The partition key list
    * @param partitionPaths The partition key value mapping
-   * @param hivePartition Whether the partition path is in Hive style
-   *
+   * @param hivePartition  Whether the partition path is in Hive style
    * @see #getReadPaths
    */
   public static Set<String> toRelativePartitionPaths(

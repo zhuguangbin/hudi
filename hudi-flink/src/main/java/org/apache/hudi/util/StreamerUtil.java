@@ -143,7 +143,7 @@ public class StreamerUtil {
     return conf;
   }
 
-  // Keep to avoid to much modifications.
+  // Keep the redundant to avoid too many modifications.
   public static org.apache.hadoop.conf.Configuration getHadoopConf() {
     return FlinkClientUtil.getHadoopConf();
   }
@@ -180,7 +180,10 @@ public class StreamerUtil {
             .forTable(conf.getString(FlinkOptions.TABLE_NAME))
             .withStorageConfig(HoodieStorageConfig.newBuilder()
                 .logFileDataBlockMaxSize(conf.getInteger(FlinkOptions.WRITE_LOG_BLOCK_SIZE) * 1024 * 1024)
-                .logFileMaxSize(conf.getInteger(FlinkOptions.WRITE_LOG_MAX_SIZE) * 1024 * 1024)
+                .logFileMaxSize(conf.getLong(FlinkOptions.WRITE_LOG_MAX_SIZE) * 1024 * 1024)
+                .parquetBlockSize(conf.getInteger(FlinkOptions.WRITE_PARQUET_BLOCK_SIZE) * 1024 * 1024)
+                .parquetPageSize(conf.getInteger(FlinkOptions.WRITE_PARQUET_PAGE_SIZE) * 1024 * 1024)
+                .parquetMaxFileSize(conf.getInteger(FlinkOptions.WRITE_PARQUET_MAX_FILE_SIZE) * 1024 * 1024L)
                 .build())
             .withMetadataConfig(HoodieMetadataConfig.newBuilder()
                 .enable(conf.getBoolean(FlinkOptions.METADATA_ENABLED))
@@ -189,7 +192,7 @@ public class StreamerUtil {
             .withEmbeddedTimelineServerReuseEnabled(true) // make write client embedded timeline service singleton
             .withAutoCommit(false)
             .withAllowOperationMetadataField(conf.getBoolean(FlinkOptions.CHANGELOG_ENABLED))
-            .withProps(flinkConf2TypedProperties(FlinkOptions.flatOptions(conf)));
+            .withProps(flinkConf2TypedProperties(conf));
 
     builder = builder.withSchema(getSourceSchema(conf).toString());
     return builder.build();
@@ -203,12 +206,13 @@ public class StreamerUtil {
    * @return a TypedProperties instance
    */
   public static TypedProperties flinkConf2TypedProperties(Configuration conf) {
+    Configuration flatConf = FlinkOptions.flatOptions(conf);
     Properties properties = new Properties();
-    // put all the set up options
-    conf.addAllToProperties(properties);
+    // put all the set options
+    flatConf.addAllToProperties(properties);
     // put all the default options
     for (ConfigOption<?> option : FlinkOptions.optionalOptions()) {
-      if (!conf.contains(option) && option.hasDefaultValue()) {
+      if (!flatConf.contains(option) && option.hasDefaultValue()) {
         properties.put(option.key(), option.defaultValue());
       }
     }
@@ -246,7 +250,7 @@ public class StreamerUtil {
           basePath, conf.getString(FlinkOptions.TABLE_NAME));
     }
     // Do not close the filesystem in order to use the CACHE,
-    // some of the filesystems release the handles in #close method.
+    // some filesystems release the handles in #close method.
   }
 
   /**
@@ -355,7 +359,7 @@ public class StreamerUtil {
   }
 
   /**
-   * Return the median instant time between the given two instant time.
+   * Returns the median instant time between the given two instant time.
    */
   public static String medianInstantTime(String highVal, String lowVal) {
     try {
@@ -395,6 +399,10 @@ public class StreamerUtil {
     }
   }
 
+  /**
+   * Returns whether the give file is in valid hoodie format.
+   * For example, filtering out the empty or corrupt files.
+   */
   public static boolean isValidFile(FileStatus fileStatus) {
     final String extension = FSUtils.getFileExtension(fileStatus.getPath().toString());
     if (PARQUET.getFileExtension().equals(extension)) {
@@ -412,11 +420,19 @@ public class StreamerUtil {
     return fileStatus.getLen() > 0;
   }
 
+  /**
+   * Returns whether insert deduplication is allowed with given configuration {@code conf}.
+   */
   public static boolean allowDuplicateInserts(Configuration conf) {
     WriteOperationType operationType = WriteOperationType.fromValue(conf.getString(FlinkOptions.OPERATION));
     return operationType == WriteOperationType.INSERT && !conf.getBoolean(FlinkOptions.INSERT_DEDUP);
   }
 
+  /**
+   * Returns whether there are successful commits on the timeline.
+   * @param metaClient The meta client
+   * @return true if there is any successful commit
+   */
   public static boolean haveSuccessfulCommits(HoodieTableMetaClient metaClient) {
     return !metaClient.getCommitsTimeline().filterCompletedInstants().empty();
   }
