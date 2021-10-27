@@ -127,5 +127,5 @@ Please visit [https://hudi.apache.org/docs/quick-start-guide.html](https://hudi.
 
 To integrate with qihoo infra, build using the following profile
 ```
-mvn clean package  -DskipTests -Pspark3 -Pflink-bundle-shade-hive2 -Pinclude-flink-sql-connector-hive
+mvn clean package  -DskipTests -Pspark3 -Pflink-bundle-shade-hive2
 ```
