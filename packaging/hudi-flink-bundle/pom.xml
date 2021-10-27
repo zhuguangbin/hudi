@@ -216,6 +216,10 @@
                   <pattern>org.eclipse.jetty.</pattern>
                   <shadedPattern>${flink.bundle.shade.prefix}org.apache.jetty.</shadedPattern>
                 </relocation>
+                <relocation>
+                  <pattern>com.esotericsoftware.kryo.</pattern>
+                  <shadedPattern>${flink.bundle.shade.prefix}com.esotericsoftware.kryo.</shadedPattern>
+                </relocation>
               </relocations>
               <filters>
                 <filter>
