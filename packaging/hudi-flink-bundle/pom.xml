@@ -160,6 +160,15 @@
                   <shadedPattern>${flink.bundle.shade.prefix}org.apache.parquet.</shadedPattern>
                 </relocation>
                 <relocation>
+                  <pattern>com.yammer.metrics.</pattern>
+                  <shadedPattern>${flink.bundle.shade.prefix}com.yammer.metrics.</shadedPattern>
+                </relocation>
+                <relocation>
+                  <pattern>com.beust.jcommander.</pattern>
+                  <shadedPattern>${flink.bundle.shade.prefix}com.beust.jcommander.</shadedPattern>
+                </relocation>
+                <!--
+                <relocation>
                   <pattern>org.apache.thrift.</pattern>
                   <shadedPattern>${flink.bundle.shade.prefix}org.apache.thrift.</shadedPattern>
                 </relocation>
@@ -168,13 +177,6 @@
                   <shadedPattern>${flink.bundle.shade.prefix}org.apache.orc.</shadedPattern>
                 </relocation>
                 <relocation>
-                  <pattern>com.yammer.metrics.</pattern>
-                  <shadedPattern>${flink.bundle.shade.prefix}com.yammer.metrics.</shadedPattern>
-                </relocation>
-                <relocation>
-                  <pattern>com.beust.jcommander.</pattern>
-                  <shadedPattern>${flink.bundle.shade.prefix}com.beust.jcommander.</shadedPattern>
-                </relocation>
                 <relocation>
                   <pattern>org.apache.hive.</pattern>
                   <shadedPattern>${flink.bundle.shade.prefix}org.apache.hive.</shadedPattern>
@@ -191,6 +193,7 @@
                   <pattern>org.apache.hadoop.hbase.</pattern>
                   <shadedPattern>${flink.bundle.shade.prefix}org.apache.hadoop.hbase.</shadedPattern>
                 </relocation>
+                -->
                 <relocation>
                   <pattern>com.codahale.metrics.</pattern>
                   <shadedPattern>${flink.bundle.shade.prefix}com.codahale.metrics.</shadedPattern>
