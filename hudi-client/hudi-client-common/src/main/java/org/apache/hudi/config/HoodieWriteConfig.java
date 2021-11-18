@@ -85,6 +85,10 @@ public class HoodieWriteConfig extends HoodieConfig {
 
   private static final long serialVersionUID = 0L;
 
+  // This is a constant as is should never be changed via config (will invalidate previous commits)
+  // It is here so that both the client and deltastreamer use the same reference
+  public static final String DELTASTREAMER_CHECKPOINT_KEY = "deltastreamer.checkpoint.key";
+
   public static final ConfigProperty<String> TBL_NAME = ConfigProperty
       .key("hoodie.table.name")
       .noDefaultValue()
@@ -116,9 +120,9 @@ public class HoodieWriteConfig extends HoodieConfig {
 
   public static final ConfigProperty<String> ROLLBACK_USING_MARKERS_ENABLE = ConfigProperty
       .key("hoodie.rollback.using.markers")
-      .defaultValue("false")
+      .defaultValue("true")
       .withDocumentation("Enables a more efficient mechanism for rollbacks based on the marker files generated "
-          + "during the writes. Turned off by default.");
+          + "during the writes. Turned on by default.");
 
   public static final ConfigProperty<String> TIMELINE_LAYOUT_VERSION_NUM = ConfigProperty
       .key("hoodie.timeline.layout.version")
@@ -155,12 +159,12 @@ public class HoodieWriteConfig extends HoodieConfig {
 
   public static final ConfigProperty<String> INSERT_PARALLELISM_VALUE = ConfigProperty
       .key("hoodie.insert.shuffle.parallelism")
-      .defaultValue("1500")
+      .defaultValue("200")
       .withDocumentation("Parallelism for inserting records into the table. Inserts can shuffle data before writing to tune file sizes and optimize the storage layout.");
 
   public static final ConfigProperty<String> BULKINSERT_PARALLELISM_VALUE = ConfigProperty
       .key("hoodie.bulkinsert.shuffle.parallelism")
-      .defaultValue("1500")
+      .defaultValue("200")
       .withDocumentation("For large initial imports using bulk_insert operation, controls the parallelism to use for sort modes or custom partitioning done"
           + "before writing records to the table.");
 
@@ -179,13 +183,13 @@ public class HoodieWriteConfig extends HoodieConfig {
 
   public static final ConfigProperty<String> UPSERT_PARALLELISM_VALUE = ConfigProperty
       .key("hoodie.upsert.shuffle.parallelism")
-      .defaultValue("1500")
+      .defaultValue("200")
       .withDocumentation("Parallelism to use for upsert operation on the table. Upserts can shuffle data to perform index lookups, file sizing, bin packing records optimally"
           + "into file groups.");
 
   public static final ConfigProperty<String> DELETE_PARALLELISM_VALUE = ConfigProperty
       .key("hoodie.delete.shuffle.parallelism")
-      .defaultValue("1500")
+      .defaultValue("200")
       .withDocumentation("Parallelism used for “delete” operation. Delete operations also performs shuffles, similar to upsert operation.");
 
   public static final ConfigProperty<String> ROLLBACK_PARALLELISM_VALUE = ConfigProperty
@@ -237,7 +241,7 @@ public class HoodieWriteConfig extends HoodieConfig {
 
   public static final ConfigProperty<String> FINALIZE_WRITE_PARALLELISM_VALUE = ConfigProperty
       .key("hoodie.finalize.write.parallelism")
-      .defaultValue("1500")
+      .defaultValue("200")
       .withDocumentation("Parallelism for the write finalization internal operation, which involves removing any partially written "
           + "files from lake storage, before committing the write. Reduce this value, if the high number of tasks incur delays for smaller tables "
           + "or low latency writes.");
@@ -368,11 +372,13 @@ public class HoodieWriteConfig extends HoodieConfig {
           + "OPTIMISTIC_CONCURRENCY_CONTROL: Multiple writers can operate on the table and exactly one of them succeed "
           + "if a conflict (writes affect the same file group) is detected.");
 
-  public static final ConfigProperty<String> WRITE_META_KEY_PREFIXES = ConfigProperty
-      .key("hoodie.write.meta.key.prefixes")
-      .defaultValue("")
-      .withDocumentation("Comma separated metadata key prefixes to override from latest commit "
-          + "during overlapping commits via multi writing");
+  public static final ConfigProperty<Boolean> WRITE_CONCURRENCY_MERGE_DELTASTREAMER_STATE = ConfigProperty
+      .key("hoodie.write.concurrency.merge.deltastreamer.state")
+      .defaultValue(false)
+      .withAlternatives("hoodie.write.meta.key.prefixes")
+      .withDocumentation("If enabled, this writer will merge Deltastreamer state from the previous checkpoint in order to allow both realtime "
+          + "and batch writers to ingest into a single table. This should not be enabled on Deltastreamer writers. Enabling this config means,"
+          + "for a spark writer, deltastreamer checkpoint will be copied over from previous commit to the current one.");
 
   /**
    * Currently the  use this to specify the write schema.
@@ -784,16 +790,6 @@ public class HoodieWriteConfig extends HoodieConfig {
   @Deprecated
   public static final String DEFAULT_WRITE_CONCURRENCY_MODE = WRITE_CONCURRENCY_MODE.defaultValue();
   /**
-   * @deprecated Use {@link #WRITE_META_KEY_PREFIXES} and its methods instead
-   */
-  @Deprecated
-  public static final String WRITE_META_KEY_PREFIXES_PROP = WRITE_META_KEY_PREFIXES.key();
-  /**
-   * @deprecated Use {@link #WRITE_META_KEY_PREFIXES} and its methods instead
-   */
-  @Deprecated
-  public static final String DEFAULT_WRITE_META_KEY_PREFIXES = WRITE_META_KEY_PREFIXES.defaultValue();
-  /**
    * @deprecated Use {@link #ALLOW_MULTI_WRITE_ON_SAME_INSTANT_ENABLE} and its methods instead
    */
   @Deprecated
@@ -1139,6 +1135,10 @@ public class HoodieWriteConfig extends HoodieConfig {
     return getBoolean(HoodieCompactionConfig.COMPACTION_REVERSE_LOG_READ_ENABLE);
   }
 
+  public int getArchiveDeleteParallelism() {
+    return getInt(HoodieCompactionConfig.DELETE_ARCHIVED_INSTANT_PARALLELISM_VALUE);
+  }
+
   public boolean inlineClusteringEnabled() {
     return getBoolean(HoodieClusteringConfig.INLINE_CLUSTERING);
   }
@@ -1229,6 +1229,30 @@ public class HoodieWriteConfig extends HoodieConfig {
   }
 
   /**
+   * Data layout optimize properties.
+   */
+  public boolean isLayoutOptimizationEnabled() {
+    return getBoolean(HoodieClusteringConfig.LAYOUT_OPTIMIZE_ENABLE);
+  }
+
+  public String getLayoutOptimizationStrategy() {
+    return getString(HoodieClusteringConfig.LAYOUT_OPTIMIZE_STRATEGY);
+  }
+
+  public HoodieClusteringConfig.BuildCurveStrategyType getLayoutOptimizationCurveBuildMethod() {
+    return HoodieClusteringConfig.BuildCurveStrategyType.fromValue(
+        getString(HoodieClusteringConfig.LAYOUT_OPTIMIZE_CURVE_BUILD_METHOD));
+  }
+
+  public int getLayoutOptimizationSampleSize() {
+    return getInt(HoodieClusteringConfig.LAYOUT_OPTIMIZE_BUILD_CURVE_SAMPLE_SIZE);
+  }
+
+  public boolean isDataSkippingEnabled() {
+    return getBoolean(HoodieClusteringConfig.LAYOUT_OPTIMIZE_DATA_SKIPPING_ENABLE);
+  }
+
+  /**
    * index properties.
    */
   public HoodieIndex.IndexType getIndexType() {
@@ -1275,8 +1299,8 @@ public class HoodieWriteConfig extends HoodieConfig {
     return getInt(HoodieHBaseIndexConfig.PUT_BATCH_SIZE);
   }
 
-  public Boolean getHbaseIndexPutBatchSizeAutoCompute() {
-    return getBoolean(HoodieHBaseIndexConfig.PUT_BATCH_SIZE_AUTO_COMPUTE);
+  public boolean getHbaseIndexPutBatchSizeAutoCompute() {
+    return getBooleanOrDefault(HoodieHBaseIndexConfig.PUT_BATCH_SIZE_AUTO_COMPUTE);
   }
 
   public String getHBaseQPSResourceAllocatorClass() {
@@ -1337,7 +1361,7 @@ public class HoodieWriteConfig extends HoodieConfig {
   }
 
   public boolean getHbaseIndexUpdatePartitionPath() {
-    return getBoolean(HoodieHBaseIndexConfig.UPDATE_PARTITION_PATH_ENABLE);
+    return getBooleanOrDefault(HoodieHBaseIndexConfig.UPDATE_PARTITION_PATH_ENABLE);
   }
 
   public int getBloomIndexParallelism() {
@@ -1413,6 +1437,14 @@ public class HoodieWriteConfig extends HoodieConfig {
 
   public boolean parquetDictionaryEnabled() {
     return getBoolean(HoodieStorageConfig.PARQUET_DICTIONARY_ENABLED);
+  }
+
+  public String parquetWriteLegacyFormatEnabled() {
+    return getString(HoodieStorageConfig.PARQUET_WRITE_LEGACY_FORMAT_ENABLED);
+  }
+
+  public String parquetOutputTimestampType() {
+    return getString(HoodieStorageConfig.PARQUET_OUTPUT_TIMESTAMP_TYPE);
   }
 
   public long getLogFileMaxSize() {
@@ -1732,12 +1764,12 @@ public class HoodieWriteConfig extends HoodieConfig {
     return WriteConcurrencyMode.fromValue(getString(WRITE_CONCURRENCY_MODE));
   }
 
-  public Boolean inlineTableServices() {
-    return inlineClusteringEnabled() || inlineCompactionEnabled() || isAutoClean();
+  public Boolean mergeDeltastreamerStateFromPreviousCommit() {
+    return getBoolean(HoodieWriteConfig.WRITE_CONCURRENCY_MERGE_DELTASTREAMER_STATE);
   }
 
-  public String getWriteMetaKeyPrefixes() {
-    return getString(WRITE_META_KEY_PREFIXES);
+  public Boolean inlineTableServices() {
+    return inlineClusteringEnabled() || inlineCompactionEnabled() || isAutoClean();
   }
 
   public String getPreCommitValidators() {
@@ -1776,6 +1808,7 @@ public class HoodieWriteConfig extends HoodieConfig {
     private boolean isStorageConfigSet = false;
     private boolean isCompactionConfigSet = false;
     private boolean isClusteringConfigSet = false;
+    private boolean isOptimizeConfigSet = false;
     private boolean isMetricsConfigSet = false;
     private boolean isBootstrapConfigSet = false;
     private boolean isMemoryConfigSet = false;
@@ -2098,11 +2131,6 @@ public class HoodieWriteConfig extends HoodieConfig {
       return this;
     }
 
-    public Builder withWriteMetaKeyPrefixes(String writeMetaKeyPrefixes) {
-      writeConfig.setValue(WRITE_META_KEY_PREFIXES, writeMetaKeyPrefixes);
-      return this;
-    }
-
     public Builder withPopulateMetaFields(boolean populateMetaFields) {
       writeConfig.setValue(HoodieTableConfig.POPULATE_META_FIELDS, Boolean.toString(populateMetaFields));
       return this;
@@ -2151,7 +2179,7 @@ public class HoodieWriteConfig extends HoodieConfig {
       writeConfig.setDefaultOnCondition(!isPayloadConfigSet,
           HoodiePayloadConfig.newBuilder().fromProperties(writeConfig.getProps()).build());
       writeConfig.setDefaultOnCondition(!isMetadataConfigSet,
-          HoodieMetadataConfig.newBuilder().fromProperties(writeConfig.getProps()).build());
+          HoodieMetadataConfig.newBuilder().withEngineType(engineType).fromProperties(writeConfig.getProps()).build());
       writeConfig.setDefaultOnCondition(!isLockConfigSet,
           HoodieLockConfig.newBuilder().fromProperties(writeConfig.getProps()).build());
       writeConfig.setDefaultOnCondition(!isPreCommitValidationConfigSet,

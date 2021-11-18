@@ -17,27 +17,27 @@
 
 package org.apache.spark.sql.hudi.command.payload
 
-import org.apache.avro.Schema
 import org.apache.avro.generic.IndexedRecord
-import org.apache.hudi.SparkAdapterSupport
-import org.apache.spark.sql.avro.{AvroDeserializer, SchemaConverters}
+import org.apache.avro.Schema
+import org.apache.spark.sql.avro.{HooodieAvroDeserializer, SchemaConverters}
+import org.apache.spark.sql.catalyst.InternalRow
 import org.apache.spark.sql.types._
 
 /**
  * A sql typed record which will convert the avro field to sql typed value.
  */
-class SqlTypedRecord(val record: IndexedRecord) extends IndexedRecord with SparkAdapterSupport {
+class SqlTypedRecord(val record: IndexedRecord) extends IndexedRecord {
 
   private lazy val sqlType = SchemaConverters.toSqlType(getSchema).dataType.asInstanceOf[StructType]
-  private lazy val avroDeserializer = new AvroDeserializer(record.getSchema, sqlType)
-  private lazy val sqlRow = sparkAdapter.deserializeAvroToInternal(record, avroDeserializer)
+  private lazy val avroDeserializer = HooodieAvroDeserializer(record.getSchema, sqlType)
+  private lazy val sqlRow = avroDeserializer.deserializeData(record).asInstanceOf[InternalRow]
 
   override def put(i: Int, v: Any): Unit = {
     record.put(i, v)
   }
 
   override def get(i: Int): AnyRef = {
-    sqlRow.map(_.get(i, sqlType(i).dataType)).orNull
+    sqlRow.get(i, sqlType(i).dataType)
   }
 
   override def getSchema: Schema = record.getSchema

@@ -17,8 +17,6 @@
 
 package org.apache.spark.sql.adapter
 
-import org.apache.avro.Schema
-import org.apache.avro.generic.IndexedRecord
 import org.apache.hudi.Spark2RowSerDe
 import org.apache.hudi.client.utils.SparkRowSerDe
 import org.apache.spark.sql.{Row, SparkSession}
@@ -28,13 +26,11 @@ import org.apache.spark.sql.catalyst.expressions.{Expression, Like}
 import org.apache.spark.sql.catalyst.parser.ParserInterface
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical.{InsertIntoTable, Join, LogicalPlan}
-import org.apache.spark.sql.catalyst.{AliasIdentifier, InternalRow, TableIdentifier}
+import org.apache.spark.sql.catalyst.{AliasIdentifier, TableIdentifier}
 import org.apache.spark.sql.execution.datasources.{Spark2ParsePartitionUtil, SparkParsePartitionUtil}
 import org.apache.spark.sql.hudi.SparkAdapter
-import org.apache.spark.sql.hudi.SparkAdapter.{AvroDeserializer, AvroSerializer}
 import org.apache.spark.sql.hudi.parser.HoodieSpark2ExtendedSqlParser
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.{DataType, StructType}
 
 /**
  * The adapter for spark2.
@@ -87,9 +83,7 @@ class Spark2Adapter extends SparkAdapter {
     Like(left, right)
   }
 
-  override def createAvroDeserializer(requiredAvroSchema: Schema, requiredStructSchema: StructType): AvroDeserializer = new AvroDeserializer(requiredAvroSchema, requiredStructSchema)
-
-  override def createAvroSerializer(requiredStructSchema: DataType, requiredAvroSchema: Schema, nullable: Boolean): AvroSerializer = new AvroSerializer(requiredStructSchema, requiredAvroSchema, nullable)
-
-  override def deserializeAvroToInternal(record: IndexedRecord, avroDeserializer: AvroDeserializer): Option[InternalRow] = Option(avroDeserializer.deserialize(record).asInstanceOf[InternalRow])
+  override def parseMultipartIdentifier(parser: ParserInterface, sqlText: String): Seq[String] = {
+    throw new IllegalStateException(s"Should not call ParserInterface#parseMultipartIdentifier for spark2")
+  }
 }

@@ -18,8 +18,6 @@
 
 package org.apache.spark.sql.hudi
 
-import org.apache.avro.Schema
-import org.apache.avro.generic.IndexedRecord
 import org.apache.hudi.client.utils.SparkRowSerDe
 import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
 import org.apache.spark.sql.catalyst.encoders.ExpressionEncoder
@@ -27,11 +25,9 @@ import org.apache.spark.sql.catalyst.expressions.Expression
 import org.apache.spark.sql.catalyst.parser.ParserInterface
 import org.apache.spark.sql.catalyst.plans.JoinType
 import org.apache.spark.sql.catalyst.plans.logical.{Join, LogicalPlan}
-import org.apache.spark.sql.catalyst.{AliasIdentifier, InternalRow, TableIdentifier}
+import org.apache.spark.sql.catalyst.{AliasIdentifier, TableIdentifier}
 import org.apache.spark.sql.execution.datasources.SparkParsePartitionUtil
-import org.apache.spark.sql.hudi.SparkAdapter.{AvroDeserializer, AvroSerializer}
 import org.apache.spark.sql.internal.SQLConf
-import org.apache.spark.sql.types.{DataType, StructType}
 import org.apache.spark.sql.{Row, SparkSession}
 
 /**
@@ -67,14 +63,12 @@ trait SparkAdapter extends Serializable {
 
   /**
    * Get the member of the Insert Into LogicalPlan.
-   * when InsertIntoHoodieTableCommand support userSpecifiedCols, we should expand this api
    */
   def getInsertIntoChildren(plan: LogicalPlan):
     Option[(LogicalPlan, Map[String, Option[String]], LogicalPlan, Boolean, Boolean)]
 
   /**
    * Create a Insert Into LogicalPlan.
-   * when InsertIntoHoodieTableCommand support userSpecifiedCols, we should expand this api
    */
   def createInsertInto(table: LogicalPlan, partition: Map[String, Option[String]],
     query: LogicalPlan, overwrite: Boolean, ifPartitionNotExists: Boolean): LogicalPlan
@@ -95,21 +89,7 @@ trait SparkAdapter extends Serializable {
   def createLike(left: Expression, right: Expression): Expression
 
   /**
-   * Create an self AvroDeserializer.
+   * ParserInterface#parseMultipartIdentifier is supported since spark3, for spark2 this should not be called.
    */
-  def createAvroDeserializer(requiredAvroSchema: Schema, requiredStructSchema: StructType): AvroDeserializer
-
-  /**
-   * Create an self AvroDeserializer.
-   */
-  def createAvroSerializer(requiredStructSchema: DataType, requiredAvroSchema: Schema, nullable: Boolean): AvroSerializer
-
-  def deserializeAvroToInternal(record: IndexedRecord, avroDeserializer: AvroDeserializer): Option[InternalRow]
-
-}
-
-object SparkAdapter {
-  type AvroDeserializer = org.apache.spark.sql.avro.AvroDeserializer
-
-  type AvroSerializer = org.apache.spark.sql.avro.AvroSerializer
+  def parseMultipartIdentifier(parser: ParserInterface, sqlText: String): Seq[String]
 }

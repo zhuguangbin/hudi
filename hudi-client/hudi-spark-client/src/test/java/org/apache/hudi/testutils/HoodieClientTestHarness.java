@@ -43,6 +43,7 @@ import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.collection.Pair;
 import org.apache.hudi.config.HoodieIndexConfig;
 import org.apache.hudi.config.HoodieWriteConfig;
+import org.apache.hudi.data.HoodieJavaRDD;
 import org.apache.hudi.exception.HoodieMetadataException;
 import org.apache.hudi.index.HoodieIndex;
 import org.apache.hudi.keygen.SimpleKeyGenerator;
@@ -248,7 +249,15 @@ public abstract class HoodieClientTestHarness extends HoodieCommonTestHarness im
     initMetaClient(getTableType());
   }
 
+  protected void initMetaClient(Properties properties) throws IOException {
+    initMetaClient(getTableType(), properties);
+  }
+
   protected void initMetaClient(HoodieTableType tableType) throws IOException {
+    initMetaClient(tableType, new Properties());
+  }
+
+  protected void initMetaClient(HoodieTableType tableType, Properties properties) throws IOException {
     if (basePath == null) {
       throw new IllegalStateException("The base path has not been initialized.");
     }
@@ -257,7 +266,10 @@ public abstract class HoodieClientTestHarness extends HoodieCommonTestHarness im
       throw new IllegalStateException("The Spark context has not been initialized.");
     }
 
-    metaClient = HoodieTestUtils.init(hadoopConf, basePath, tableType);
+    if (tableName != null && !tableName.isEmpty()) {
+      properties.put(HoodieTableConfig.NAME.key(), tableName);
+    }
+    metaClient = HoodieTestUtils.init(hadoopConf, basePath, tableType, properties);
   }
 
   protected Properties getPropertiesForKeyGen() {
@@ -411,6 +423,12 @@ public abstract class HoodieClientTestHarness extends HoodieCommonTestHarness im
       tableView.init(metaClient, visibleActiveTimeline, fileStatuses);
     }
     return tableView;
+  }
+
+  public JavaRDD<HoodieRecord> tagLocation(
+      HoodieIndex index, JavaRDD<HoodieRecord> records, HoodieTable table) {
+    return HoodieJavaRDD.getJavaRDD(
+        index.tagLocation(HoodieJavaRDD.of(records), context, table));
   }
 
   public static Pair<HashMap<String, WorkloadStat>, WorkloadStat> buildProfile(JavaRDD<HoodieRecord> inputRecordsRDD) {

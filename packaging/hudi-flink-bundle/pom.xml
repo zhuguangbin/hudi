@@ -82,6 +82,7 @@
                   <include>org.apache.hudi:hudi-sync-common</include>
                   <include>org.apache.hudi:hudi-hadoop-mr</include>
                   <include>org.apache.hudi:hudi-timeline-service</include>
+                  <include>org.apache.hudi:hudi-aws</include>
 
                   <include>com.yammer.metrics:metrics-core</include>
                   <include>com.beust:jcommander</include>
@@ -144,6 +145,10 @@
                   <include>org.apache.hbase:hbase-protocol</include>
                   <include>org.apache.htrace:htrace-core</include>
                   <include>commons-codec:commons-codec</include>
+
+                  <include>com.amazonaws:dynamodb-lock-client</include>
+                  <include>com.amazonaws:aws-java-sdk-dynamodb</include>
+                  <include>com.amazonaws:aws-java-sdk-core</include>
                 </includes>
               </artifactSet>
               <relocations>
@@ -607,6 +612,14 @@
       <version>${hbase.version}</version>
       <scope>compile</scope>
       <exclusions>
+        <exclusion>
+          <artifactId>guava</artifactId>
+          <groupId>com.google.guava</groupId>
+        </exclusion>
+        <exclusion>
+          <groupId>org.apache.hbase</groupId>
+          <artifactId>hbase-common</artifactId>
+        </exclusion>
         <exclusion>
           <groupId>javax.servlet</groupId>
           <artifactId>*</artifactId>

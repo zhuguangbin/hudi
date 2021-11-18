@@ -33,7 +33,7 @@ import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieException;
 import org.apache.hudi.exception.HoodieMetadataException;
 import org.apache.hudi.index.HoodieIndex;
-import org.apache.hudi.index.SparkHoodieIndex;
+import org.apache.hudi.index.SparkHoodieIndexFactory;
 import org.apache.hudi.metadata.HoodieTableMetadata;
 import org.apache.hudi.metadata.HoodieTableMetadataWriter;
 import org.apache.hudi.metadata.SparkHoodieBackedTableMetadataWriter;
@@ -102,8 +102,8 @@ public abstract class HoodieSparkTable<T extends HoodieRecordPayload>
   }
 
   @Override
-  protected HoodieIndex<T, JavaRDD<HoodieRecord<T>>, JavaRDD<HoodieKey>, JavaRDD<WriteStatus>> getIndex(HoodieWriteConfig config, HoodieEngineContext context) {
-    return SparkHoodieIndex.createIndex(config);
+  protected HoodieIndex getIndex(HoodieWriteConfig config, HoodieEngineContext context) {
+    return SparkHoodieIndexFactory.createIndex(config);
   }
 
   /**
@@ -128,7 +128,7 @@ public abstract class HoodieSparkTable<T extends HoodieRecordPayload>
     }
     if (isMetadataTableAvailable) {
       return Option.of(SparkHoodieBackedTableMetadataWriter.create(context.getHadoopConf().get(), config, context,
-          actionMetadata));
+          actionMetadata, Option.empty()));
     } else {
       return Option.empty();
     }

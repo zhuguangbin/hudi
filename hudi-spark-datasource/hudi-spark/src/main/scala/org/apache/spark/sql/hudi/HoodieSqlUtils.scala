@@ -90,7 +90,7 @@ object HoodieSqlUtils extends SparkAdapterSupport {
     val sparkEngine = new HoodieSparkEngineContext(new JavaSparkContext(spark.sparkContext))
     val metadataConfig = {
       val properties = new Properties()
-      properties.putAll((spark.sessionState.conf.getAllConfs ++ table.storage.properties).asJava)
+      properties.putAll((spark.sessionState.conf.getAllConfs ++ table.storage.properties ++ table.properties).asJava)
       HoodieMetadataConfig.newBuilder.fromProperties(properties).build()
     }
     FSUtils.getAllPartitionPaths(sparkEngine, metadataConfig, getTableLocation(table, spark)).asScala
@@ -293,12 +293,12 @@ object HoodieSqlUtils extends SparkAdapterSupport {
    */
   def formatQueryInstant(queryInstant: String): String = {
     if (queryInstant.length == 19) { // for yyyy-MM-dd HH:mm:ss
-      HoodieActiveTimeline.COMMIT_FORMATTER.format(defaultDateTimeFormat.parse(queryInstant))
+      HoodieActiveTimeline.formatInstantTime(defaultDateTimeFormat.parse(queryInstant))
     } else if (queryInstant.length == 14) { // for yyyyMMddHHmmss
-      HoodieActiveTimeline.COMMIT_FORMATTER.parse(queryInstant) // validate the format
+      HoodieActiveTimeline.parseInstantTime(queryInstant) // validate the format
       queryInstant
     } else if (queryInstant.length == 10) { // for yyyy-MM-dd
-      HoodieActiveTimeline.COMMIT_FORMATTER.format(defaultDateFormat.parse(queryInstant))
+      HoodieActiveTimeline.formatInstantTime(defaultDateFormat.parse(queryInstant))
     } else {
       throw new IllegalArgumentException(s"Unsupported query instant time format: $queryInstant,"
         + s"Supported time format are: 'yyyy-MM-dd: HH:mm:ss' or 'yyyy-MM-dd' or 'yyyyMMddHHmmss'")

@@ -28,10 +28,12 @@ import org.apache.hudi.common.config.TypedProperties;
 import org.apache.hudi.common.engine.EngineType;
 import org.apache.hudi.common.fs.FSUtils;
 import org.apache.hudi.common.model.HoodieCleaningPolicy;
+import org.apache.hudi.common.table.HoodieTableConfig;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.log.HoodieLogFormat;
 import org.apache.hudi.common.table.timeline.HoodieActiveTimeline;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.table.view.FileSystemViewStorageConfig;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.common.util.ReflectionUtils;
@@ -238,6 +240,8 @@ public class StreamerUtil {
     Properties properties = new Properties();
     // put all the set options
     flatConf.addAllToProperties(properties);
+    // ugly: table keygen clazz, needed by TwoToThreeUpgradeHandler
+    properties.put(HoodieTableConfig.KEY_GENERATOR_CLASS_NAME.key(), conf.getString(FlinkOptions.KEYGEN_CLASS_NAME));
     // put all the default options
     for (ConfigOption<?> option : FlinkOptions.optionalOptions()) {
       if (!flatConf.contains(option) && option.hasDefaultValue()) {
@@ -267,9 +271,12 @@ public class StreamerUtil {
           .setTableName(conf.getString(FlinkOptions.TABLE_NAME))
           .setRecordKeyFields(conf.getString(FlinkOptions.RECORD_KEY_FIELD, null))
           .setPayloadClassName(conf.getString(FlinkOptions.PAYLOAD_CLASS_NAME))
+          .setPreCombineField(OptionsResolver.getPreCombineField(conf))
           .setArchiveLogFolder(ARCHIVELOG_FOLDER.defaultValue())
           .setPartitionFields(conf.getString(FlinkOptions.PARTITION_PATH_FIELD, null))
-          .setPreCombineField(conf.getString(FlinkOptions.PRECOMBINE_FIELD))
+          .setKeyGeneratorClassProp(conf.getString(FlinkOptions.KEYGEN_CLASS_NAME))
+          .setHiveStylePartitioningEnable(conf.getBoolean(FlinkOptions.HIVE_STYLE_PARTITIONING))
+          .setUrlEncodePartitioning(conf.getBoolean(FlinkOptions.URL_ENCODE_PARTITIONING))
           .setTimelineLayoutVersion(1)
           .initTable(hadoopConf, basePath);
       LOG.info("Table initialized under base path {}", basePath);
@@ -401,14 +408,19 @@ public class StreamerUtil {
   /**
    * Returns the median instant time between the given two instant time.
    */
-  public static String medianInstantTime(String highVal, String lowVal) {
+  public static Option<String> medianInstantTime(String highVal, String lowVal) {
     try {
-      long high = HoodieActiveTimeline.COMMIT_FORMATTER.parse(highVal).getTime();
-      long low = HoodieActiveTimeline.COMMIT_FORMATTER.parse(lowVal).getTime();
+      long high = HoodieActiveTimeline.parseInstantTime(highVal).getTime();
+      long low = HoodieActiveTimeline.parseInstantTime(lowVal).getTime();
       ValidationUtils.checkArgument(high > low,
           "Instant [" + highVal + "] should have newer timestamp than instant [" + lowVal + "]");
       long median = low + (high - low) / 2;
-      return HoodieActiveTimeline.COMMIT_FORMATTER.format(new Date(median));
+      final String instantTime = HoodieActiveTimeline.formatInstantTime(new Date(median));
+      if (HoodieTimeline.compareTimestamps(lowVal, HoodieTimeline.GREATER_THAN_OR_EQUALS, instantTime)
+          || HoodieTimeline.compareTimestamps(highVal, HoodieTimeline.LESSER_THAN_OR_EQUALS, instantTime)) {
+        return Option.empty();
+      }
+      return Option.of(instantTime);
     } catch (ParseException e) {
       throw new HoodieException("Get median instant time with interval [" + lowVal + ", " + highVal + "] error", e);
     }
@@ -419,8 +431,8 @@ public class StreamerUtil {
    */
   public static long instantTimeDiffSeconds(String newInstantTime, String oldInstantTime) {
     try {
-      long newTimestamp = HoodieActiveTimeline.COMMIT_FORMATTER.parse(newInstantTime).getTime();
-      long oldTimestamp = HoodieActiveTimeline.COMMIT_FORMATTER.parse(oldInstantTime).getTime();
+      long newTimestamp = HoodieActiveTimeline.parseInstantTime(newInstantTime).getTime();
+      long oldTimestamp = HoodieActiveTimeline.parseInstantTime(oldInstantTime).getTime();
       return (newTimestamp - oldTimestamp) / 1000;
     } catch (ParseException e) {
       throw new HoodieException("Get instant time diff with interval [" + oldInstantTime + ", " + newInstantTime + "] error", e);
@@ -468,7 +480,7 @@ public class StreamerUtil {
     if (reloadTimeline) {
       metaClient.reloadActiveTimeline();
     }
-    return metaClient.getCommitsTimeline().filterInflightsAndRequested()
+    return metaClient.getCommitsTimeline().filterInflights()
         .lastInstant()
         .map(HoodieInstant::getTimestamp)
         .orElse(null);

@@ -32,8 +32,10 @@ import org.apache.hudi.common.engine.HoodieEngineContext;
 import org.apache.hudi.common.model.HoodieKey;
 import org.apache.hudi.common.model.HoodieRecord;
 import org.apache.hudi.common.model.HoodieRecordPayload;
+import org.apache.hudi.common.model.HoodieWriteStat;
 import org.apache.hudi.common.table.HoodieTableMetaClient;
 import org.apache.hudi.common.table.timeline.HoodieInstant;
+import org.apache.hudi.common.table.timeline.HoodieTimeline;
 import org.apache.hudi.common.util.Option;
 import org.apache.hudi.config.HoodieWriteConfig;
 import org.apache.hudi.exception.HoodieNotSupportedException;
@@ -63,6 +65,11 @@ public class HoodieJavaCopyOnWriteTable<T extends HoodieRecordPayload> extends H
                                        HoodieEngineContext context,
                                        HoodieTableMetaClient metaClient) {
     super(config, context, metaClient);
+  }
+
+  @Override
+  public boolean isTableServiceAction(String actionType) {
+    return !actionType.equals(HoodieTimeline.COMMIT_ACTION);
   }
 
   @Override
@@ -145,6 +152,11 @@ public class HoodieJavaCopyOnWriteTable<T extends HoodieRecordPayload> extends H
   }
 
   @Override
+  public void updateStatistics(HoodieEngineContext context, List<HoodieWriteStat> stats, String instantTime, Boolean isOptimizeOperation) {
+    throw new HoodieNotSupportedException("update statistics is not supported yet");
+  }
+
+  @Override
   public Option<HoodieCompactionPlan> scheduleCompaction(HoodieEngineContext context,
                                                          String instantTime,
                                                          Option<Map<String, String>> extraMetadata) {
@@ -181,8 +193,9 @@ public class HoodieJavaCopyOnWriteTable<T extends HoodieRecordPayload> extends H
 
   @Override
   public Option<HoodieRollbackPlan> scheduleRollback(HoodieEngineContext context, String instantTime, HoodieInstant instantToRollback,
-                                                     boolean skipTimelinePublish) {
-    return new BaseRollbackPlanActionExecutor(context, config, this, instantTime, instantToRollback, skipTimelinePublish).execute();
+                                                     boolean skipTimelinePublish, boolean shouldRollbackUsingMarkers) {
+    return new BaseRollbackPlanActionExecutor(context, config, this, instantTime, instantToRollback, skipTimelinePublish,
+        shouldRollbackUsingMarkers).execute();
   }
 
   @Override
@@ -192,7 +205,7 @@ public class HoodieJavaCopyOnWriteTable<T extends HoodieRecordPayload> extends H
 
   @Override
   public HoodieCleanMetadata clean(HoodieEngineContext context,
-                                   String cleanInstantTime) {
+                                   String cleanInstantTime, boolean skipLocking) {
     return new CleanActionExecutor(context, config, this, cleanInstantTime).execute();
   }
 
@@ -200,9 +213,10 @@ public class HoodieJavaCopyOnWriteTable<T extends HoodieRecordPayload> extends H
   public HoodieRollbackMetadata rollback(HoodieEngineContext context,
                                          String rollbackInstantTime,
                                          HoodieInstant commitInstant,
-                                         boolean deleteInstants) {
+                                         boolean deleteInstants,
+                                         boolean skipLocking) {
     return new CopyOnWriteRollbackActionExecutor(
-        context, config, this, rollbackInstantTime, commitInstant, deleteInstants).execute();
+        context, config, this, rollbackInstantTime, commitInstant, deleteInstants, skipLocking).execute();
   }
 
   @Override

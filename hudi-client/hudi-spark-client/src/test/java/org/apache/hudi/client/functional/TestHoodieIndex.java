@@ -98,10 +98,10 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
   private HoodieWriteConfig config;
 
   private void setUp(IndexType indexType, boolean populateMetaFields) throws Exception {
-    setUp(indexType, populateMetaFields, true);
+    setUp(indexType, populateMetaFields, true, true);
   }
 
-  private void setUp(IndexType indexType, boolean populateMetaFields, boolean enableMetadata) throws Exception {
+  private void setUp(IndexType indexType, boolean populateMetaFields, boolean enableMetadata, boolean rollbackUsingMarkers) throws Exception {
     this.indexType = indexType;
     initPath();
     initSparkContexts();
@@ -111,6 +111,7 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
         : getPropertiesForKeyGen());
     config = getConfigBuilder()
         .withProperties(populateMetaFields ? new Properties() : getPropertiesForKeyGen())
+        .withRollbackUsingMarkers(rollbackUsingMarkers)
         .withIndexConfig(HoodieIndexConfig.newBuilder().withIndexType(indexType)
             .build()).withAutoCommit(false).withMetadataConfig(HoodieMetadataConfig.newBuilder().enable(enableMetadata).build()).build();
     writeClient = getHoodieWriteClient(config);
@@ -135,7 +136,7 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
     HoodieTable hoodieTable = HoodieSparkTable.create(config, context, metaClient);
 
     // Test tagLocation without any entries in index
-    JavaRDD<HoodieRecord> javaRDD = (JavaRDD<HoodieRecord>) index.tagLocation(writeRecords, context, hoodieTable);
+    JavaRDD<HoodieRecord> javaRDD = tagLocation(index, writeRecords, hoodieTable);
     assert (javaRDD.filter(record -> record.isCurrentLocationKnown()).collect().size() == 0);
 
     // Insert totalRecords records
@@ -145,14 +146,14 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
 
     // Now tagLocation for these records, index should not tag them since it was a failed
     // commit
-    javaRDD = (JavaRDD<HoodieRecord>) index.tagLocation(writeRecords, context, hoodieTable);
+    javaRDD = tagLocation(index, writeRecords, hoodieTable);
     assert (javaRDD.filter(record -> record.isCurrentLocationKnown()).collect().size() == 0);
     // Now commit this & update location of records inserted and validate no errors
     writeClient.commit(newCommitTime, writeStatues);
     // Now tagLocation for these records, index should tag them correctly
     metaClient = HoodieTableMetaClient.reload(metaClient);
     hoodieTable = HoodieSparkTable.create(config, context, metaClient);
-    javaRDD = (JavaRDD<HoodieRecord>) index.tagLocation(writeRecords, context, hoodieTable);
+    javaRDD = tagLocation(index, writeRecords, hoodieTable);
     Map<String, String> recordKeyToPartitionPathMap = new HashMap();
     List<HoodieRecord> hoodieRecords = writeRecords.collect();
     hoodieRecords.forEach(entry -> recordKeyToPartitionPathMap.put(entry.getRecordKey(), entry.getPartitionPath()));
@@ -185,7 +186,7 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
 
     writeClient.startCommitWithTime(newCommitTime);
     JavaRDD<WriteStatus> writeStatues = writeClient.upsert(writeRecords, newCommitTime);
-    JavaRDD<HoodieRecord> javaRDD1 = (JavaRDD<HoodieRecord>) index.tagLocation(writeRecords, context, hoodieTable);
+    JavaRDD<HoodieRecord> javaRDD1 = tagLocation(index, writeRecords, hoodieTable);
 
     // Duplicate upsert and ensure correctness is maintained
     // We are trying to approximately imitate the case when the RDD is recomputed. For RDD creating, driver code is not
@@ -201,7 +202,7 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
     // Now tagLocation for these records, hbaseIndex should tag them correctly
     metaClient = HoodieTableMetaClient.reload(metaClient);
     hoodieTable = HoodieSparkTable.create(config, context, metaClient);
-    JavaRDD<HoodieRecord> javaRDD = (JavaRDD<HoodieRecord>) index.tagLocation(writeRecords, context, hoodieTable);
+    JavaRDD<HoodieRecord> javaRDD = tagLocation(index, writeRecords, hoodieTable);
 
     Map<String, String> recordKeyToPartitionPathMap = new HashMap();
     List<HoodieRecord> hoodieRecords = writeRecords.collect();
@@ -225,7 +226,7 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
   @ParameterizedTest
   @MethodSource("indexTypeParams")
   public void testSimpleTagLocationAndUpdateWithRollback(IndexType indexType, boolean populateMetaFields) throws Exception {
-    setUp(indexType, populateMetaFields, false);
+    setUp(indexType, populateMetaFields, true, false);
     String newCommitTime = writeClient.startCommit();
     int totalRecords = 20 + random.nextInt(20);
     List<HoodieRecord> records = dataGen.generateInserts(newCommitTime, totalRecords);
@@ -241,7 +242,7 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
     HoodieTable hoodieTable = HoodieSparkTable.create(config, context, metaClient);
 
     // Now tagLocation for these records, hbaseIndex should tag them
-    JavaRDD<HoodieRecord> javaRDD = (JavaRDD<HoodieRecord>) index.tagLocation(writeRecords, context, hoodieTable);
+    JavaRDD<HoodieRecord> javaRDD = tagLocation(index, writeRecords, hoodieTable);
     assert (javaRDD.filter(HoodieRecord::isCurrentLocationKnown).collect().size() == totalRecords);
 
     // check tagged records are tagged with correct fileIds
@@ -269,7 +270,7 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
     hoodieTable = HoodieSparkTable.create(config, context, metaClient);
     // Now tagLocation for these records, hbaseIndex should not tag them since it was a rolled
     // back commit
-    javaRDD = (JavaRDD<HoodieRecord>) index.tagLocation(writeRecords, context, hoodieTable);
+    javaRDD = tagLocation(index, writeRecords, hoodieTable);
     assert (javaRDD.filter(HoodieRecord::isCurrentLocationKnown).collect().size() == 0);
     assert (javaRDD.filter(record -> record.getCurrentLocation() != null).collect().size() == 0);
   }
@@ -312,7 +313,7 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
 
     HoodieTable hoodieTable = HoodieSparkTable.create(config, context, metaClient);
 
-    JavaRDD<HoodieRecord> taggedRecordRDD = (JavaRDD<HoodieRecord>) index.tagLocation(recordRDD, context, hoodieTable);
+    JavaRDD<HoodieRecord> taggedRecordRDD = tagLocation(index, recordRDD, hoodieTable);
 
     // Should not find any files
     for (HoodieRecord record : taggedRecordRDD.collect()) {
@@ -329,7 +330,7 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
     metaClient = HoodieTableMetaClient.reload(metaClient);
     hoodieTable = HoodieSparkTable.create(config, context, metaClient);
 
-    taggedRecordRDD = (JavaRDD<HoodieRecord>) index.tagLocation(recordRDD, context, hoodieTable);
+    taggedRecordRDD = tagLocation(index, recordRDD, hoodieTable);
 
     // Check results
     for (HoodieRecord record : taggedRecordRDD.collect()) {
@@ -419,7 +420,7 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
 
     // test against incoming record with a different partition
     JavaRDD<HoodieRecord> recordRDD = jsc.parallelize(Collections.singletonList(incomingRecord));
-    JavaRDD<HoodieRecord> taggedRecordRDD = (JavaRDD<HoodieRecord>) index.tagLocation(recordRDD, context, hoodieTable);
+    JavaRDD<HoodieRecord> taggedRecordRDD = tagLocation(index, recordRDD, hoodieTable);
 
     assertEquals(2, taggedRecordRDD.count());
     for (HoodieRecord record : taggedRecordRDD.collect()) {
@@ -440,7 +441,7 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
     // test against incoming record with the same partition
     JavaRDD<HoodieRecord> recordRDDSamePartition = jsc
         .parallelize(Collections.singletonList(incomingRecordSamePartition));
-    JavaRDD<HoodieRecord> taggedRecordRDDSamePartition = (JavaRDD<HoodieRecord>) index.tagLocation(recordRDDSamePartition, context, hoodieTable);
+    JavaRDD<HoodieRecord> taggedRecordRDDSamePartition = tagLocation(index, recordRDDSamePartition, hoodieTable);
 
     assertEquals(1, taggedRecordRDDSamePartition.count());
     HoodieRecord record = taggedRecordRDDSamePartition.first();
@@ -463,8 +464,8 @@ public class TestHoodieIndex extends HoodieClientTestHarness {
   }
 
   private JavaPairRDD<HoodieKey, Option<Pair<String, String>>> getRecordLocations(JavaRDD<HoodieKey> keyRDD, HoodieTable hoodieTable) {
-    JavaRDD<HoodieRecord> recordRDD = (JavaRDD<HoodieRecord>) index.tagLocation(
-        keyRDD.map(k -> new HoodieRecord(k, new EmptyHoodieRecordPayload())), context, hoodieTable);
+    JavaRDD<HoodieRecord> recordRDD = tagLocation(
+        index, keyRDD.map(k -> new HoodieRecord(k, new EmptyHoodieRecordPayload())), hoodieTable);
     return recordRDD.mapToPair(hr -> new Tuple2<>(hr.getKey(), hr.isCurrentLocationKnown()
         ? Option.of(Pair.of(hr.getPartitionPath(), hr.getCurrentLocation().getFileId()))
         : Option.empty())

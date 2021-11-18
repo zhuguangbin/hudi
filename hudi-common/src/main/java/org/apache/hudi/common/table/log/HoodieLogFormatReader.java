@@ -44,12 +44,18 @@ public class HoodieLogFormatReader implements HoodieLogFormat.Reader {
   private final Schema readerSchema;
   private final boolean readBlocksLazily;
   private final boolean reverseLogReader;
+  private final boolean enableInLineReading;
   private int bufferSize;
 
   private static final Logger LOG = LogManager.getLogger(HoodieLogFormatReader.class);
 
   HoodieLogFormatReader(FileSystem fs, List<HoodieLogFile> logFiles, Schema readerSchema, boolean readBlocksLazily,
-      boolean reverseLogReader, int bufferSize) throws IOException {
+                        boolean reverseLogReader, int bufferSize) throws IOException {
+    this(fs, logFiles, readerSchema, readBlocksLazily, reverseLogReader, bufferSize, false);
+  }
+
+  HoodieLogFormatReader(FileSystem fs, List<HoodieLogFile> logFiles, Schema readerSchema, boolean readBlocksLazily,
+      boolean reverseLogReader, int bufferSize, boolean enableInlineReading) throws IOException {
     this.logFiles = logFiles;
     this.fs = fs;
     this.readerSchema = readerSchema;
@@ -57,9 +63,10 @@ public class HoodieLogFormatReader implements HoodieLogFormat.Reader {
     this.reverseLogReader = reverseLogReader;
     this.bufferSize = bufferSize;
     this.prevReadersInOpenState = new ArrayList<>();
+    this.enableInLineReading = enableInlineReading;
     if (logFiles.size() > 0) {
       HoodieLogFile nextLogFile = logFiles.remove(0);
-      this.currentReader = new HoodieLogFileReader(fs, nextLogFile, readerSchema, bufferSize, readBlocksLazily, false);
+      this.currentReader = new HoodieLogFileReader(fs, nextLogFile, readerSchema, bufferSize, readBlocksLazily, false, enableInlineReading);
     }
   }
 
@@ -99,7 +106,8 @@ public class HoodieLogFormatReader implements HoodieLogFormat.Reader {
           this.prevReadersInOpenState.add(currentReader);
         }
         this.currentReader =
-            new HoodieLogFileReader(fs, nextLogFile, readerSchema, bufferSize, readBlocksLazily, false);
+            new HoodieLogFileReader(fs, nextLogFile, readerSchema, bufferSize, readBlocksLazily, false,
+                this.enableInLineReading);
       } catch (IOException io) {
         throw new HoodieIOException("unable to initialize read with log file ", io);
       }

@@ -101,7 +101,7 @@ public abstract class HoodieTable<T extends HoodieRecordPayload, I, K, O> implem
 
   protected final HoodieWriteConfig config;
   protected final HoodieTableMetaClient metaClient;
-  protected final HoodieIndex<T, I, K, O> index;
+  protected final HoodieIndex<T, ?, ?, ?> index;
   private SerializableConfiguration hadoopConfiguration;
   protected final TaskContextSupplier taskContextSupplier;
   private final HoodieTableMetadata metadata;
@@ -125,7 +125,7 @@ public abstract class HoodieTable<T extends HoodieRecordPayload, I, K, O> implem
     this.taskContextSupplier = context.getTaskContextSupplier();
   }
 
-  protected abstract HoodieIndex<T, I, K, O> getIndex(HoodieWriteConfig config, HoodieEngineContext context);
+  protected abstract HoodieIndex<T, ?, ?, ?> getIndex(HoodieWriteConfig config, HoodieEngineContext context);
 
   private synchronized FileSystemViewManager getViewManager() {
     if (null == viewManager) {
@@ -244,6 +244,16 @@ public abstract class HoodieTable<T extends HoodieRecordPayload, I, K, O> implem
    */
   public abstract HoodieWriteMetadata<O> insertOverwriteTable(HoodieEngineContext context, String instantTime, I records);
 
+  /**
+   * update statistics info for current table.
+   * to do adaptation, once RFC-27 is finished.
+   *
+   * @param context HoodieEngineContext
+   * @param instantTime Instant time for the replace action
+   * @param isOptimizeOperation whether current operation is OPTIMIZE type
+   */
+  public abstract void updateStatistics(HoodieEngineContext context, List<HoodieWriteStat> stats, String instantTime, Boolean isOptimizeOperation);
+
   public HoodieWriteConfig getConfig() {
     return config;
   }
@@ -347,7 +357,7 @@ public abstract class HoodieTable<T extends HoodieRecordPayload, I, K, O> implem
   /**
    * Return the index.
    */
-  public HoodieIndex<T, I, K, O> getIndex() {
+  public HoodieIndex<T, ?, ?, ?> getIndex() {
     return index;
   }
 
@@ -424,7 +434,7 @@ public abstract class HoodieTable<T extends HoodieRecordPayload, I, K, O> implem
    *
    * @return information on cleaned file slices
    */
-  public abstract HoodieCleanMetadata clean(HoodieEngineContext context, String cleanInstantTime);
+  public abstract HoodieCleanMetadata clean(HoodieEngineContext context, String cleanInstantTime, boolean skipLocking);
 
   /**
    * Schedule rollback for the instant time.
@@ -432,12 +442,13 @@ public abstract class HoodieTable<T extends HoodieRecordPayload, I, K, O> implem
    * @param context HoodieEngineContext
    * @param instantTime Instant Time for scheduling rollback
    * @param instantToRollback instant to be rolled back
+   * @param shouldRollbackUsingMarkers uses marker based rollback strategy when set to true. uses list based rollback when false.
    * @return HoodieRollbackPlan containing info on rollback.
    */
   public abstract Option<HoodieRollbackPlan> scheduleRollback(HoodieEngineContext context,
                                                               String instantTime,
                                                               HoodieInstant instantToRollback,
-                                                              boolean skipTimelinePublish);
+                                                              boolean skipTimelinePublish, boolean shouldRollbackUsingMarkers);
   
   /**
    * Rollback the (inflight/committed) record changes with the given commit time.
@@ -452,7 +463,8 @@ public abstract class HoodieTable<T extends HoodieRecordPayload, I, K, O> implem
   public abstract HoodieRollbackMetadata rollback(HoodieEngineContext context,
                                                   String rollbackInstantTime,
                                                   HoodieInstant commitInstant,
-                                                  boolean deleteInstants);
+                                                  boolean deleteInstants,
+                                                  boolean skipLocking);
 
   /**
    * Create a savepoint at the specified instant, so that the table can be restored
@@ -479,8 +491,8 @@ public abstract class HoodieTable<T extends HoodieRecordPayload, I, K, O> implem
    */
   public void rollbackInflightCompaction(HoodieInstant inflightInstant) {
     String commitTime = HoodieActiveTimeline.createNewInstantTime();
-    scheduleRollback(context, commitTime, inflightInstant, false);
-    rollback(context, commitTime, inflightInstant, false);
+    scheduleRollback(context, commitTime, inflightInstant, false, config.shouldRollbackUsingMarkers());
+    rollback(context, commitTime, inflightInstant, false, false);
     getActiveTimeline().revertCompactionInflightToRequested(inflightInstant);
   }
 
@@ -726,6 +738,13 @@ public abstract class HoodieTable<T extends HoodieRecordPayload, I, K, O> implem
   public final Option<HoodieTableMetadataWriter> getMetadataWriter() {
     return getMetadataWriter(Option.empty());
   }
+
+  /**
+   * Check if action type is a table service.
+   * @param actionType action type of interest.
+   * @return true if action represents a table service. false otherwise.
+   */
+  public abstract boolean isTableServiceAction(String actionType);
 
   /**
    * Get Table metadata writer.
