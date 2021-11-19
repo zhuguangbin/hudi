@@ -1,0 +1,14 @@
+test:
+  tags:
+  - maven
+  script:
+  - mvn clean test -Pspark3 -Pflink-bundle-shade-hive2
+
+deploy:
+  stage: deploy
+  tags:
+  - maven
+  only:
+  - 0.10-qihoo@big-data/hudi
+  script:
+  - mvn clean package -DskipTests -Pspark3 -Pflink-bundle-shade-hive2
