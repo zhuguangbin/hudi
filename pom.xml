@@ -1081,6 +1081,16 @@
       <url>https://packages.confluent.io/maven/</url>
     </repository>
   </repositories>
+  <distributionManagement>
+    <repository>
+      <id>mediav-releases</id>
+      <url>https://maven.corp.mediav.com/nexus/content/repositories/releases</url>
+    </repository>
+    <snapshotRepository>
+      <id>mediav-snapshots</id>
+      <url>http://maven.corp.mediav.com/nexus/content/repositories/snapshots/</url>
+    </snapshotRepository>
+  </distributionManagement>
 
   <profiles>
     <profile>
