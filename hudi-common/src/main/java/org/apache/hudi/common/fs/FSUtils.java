@@ -580,7 +580,7 @@ public class FSUtils {
    * @return true if the inputstream or the wrapped one is of type GoogleHadoopFSInputStream
    */
   public static boolean isGCSFileSystem(FileSystem fs) {
-    return fs.getScheme().equals(StorageSchemes.GCS.getScheme());
+    return fs.getUri().getScheme().equals(StorageSchemes.GCS.getScheme());
   }
 
   public static Configuration registerFileSystem(Path file, Configuration conf) {
