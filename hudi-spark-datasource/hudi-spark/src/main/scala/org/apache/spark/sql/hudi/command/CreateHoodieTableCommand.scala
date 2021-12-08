@@ -228,8 +228,8 @@ case class CreateHoodieTableCommand(table: CatalogTable, ignoreIfExists: Boolean
       table, table.schema)
 
     val tableWithDataSourceProps = table.copy(properties = dataSourceProps ++ table.properties)
-    val client = HiveClientUtils.newClientForMetadata(sparkSession.sparkContext.conf,
-      sparkSession.sessionState.newHadoopConf())
+
+    val client = HiveClientUtils.sessionHiveClient(sparkSession)
     // create hive table.
     client.createTable(tableWithDataSourceProps, ignoreIfExists)
   }

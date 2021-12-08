@@ -18,12 +18,22 @@
 package org.apache.spark.sql.hive
 
 import org.apache.hadoop.conf.Configuration
-import org.apache.spark.SparkConf
+import org.apache.spark.{SparkConf, SparkException}
+import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.catalyst.catalog.ExternalCatalogWithListener
 import org.apache.spark.sql.hive.client.HiveClient
 
 object HiveClientUtils {
 
   def newClientForMetadata(conf: SparkConf, hadoopConf: Configuration): HiveClient = {
     HiveUtils.newClientForMetadata(conf, hadoopConf)
+  }
+
+  def sessionHiveClient(ss: SparkSession): HiveClient = {
+    val catalog = ss.sessionState.catalog.externalCatalog
+    if (!catalog.isInstanceOf[ExternalCatalogWithListener]) {
+      throw new SparkException("the session catalog implement is not hive")
+    }
+    catalog.asInstanceOf[ExternalCatalogWithListener].unwrapped.asInstanceOf[HiveExternalCatalog].client
   }
 }
