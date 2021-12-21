@@ -44,7 +44,7 @@ public final class HoodieMetadataConfig extends HoodieConfig {
   // Enable the internal Metadata Table which saves file listings
   public static final ConfigProperty<Boolean> ENABLE = ConfigProperty
       .key(METADATA_PREFIX + ".enable")
-      .defaultValue(true)
+      .defaultValue(false)
       .sinceVersion("0.7.0")
       .withDocumentation("Enable the internal metadata table which serves table metadata like level file listings");
 
@@ -118,19 +118,24 @@ public final class HoodieMetadataConfig extends HoodieConfig {
       .sinceVersion("0.7.0")
       .withDocumentation("Parallelism to use, when listing the table on lake storage.");
 
-  public static final ConfigProperty<Boolean> ENABLE_INLINE_READING = ConfigProperty
-      .key(METADATA_PREFIX + ".enable.inline.reading")
-      .defaultValue(true)
-      .sinceVersion("0.10.0")
-      .withDocumentation("Enable inline reading of Log files. By default log block contents are read as byte[] using regular input stream and records "
-          + "are deserialized from it. Enabling this will read each log block as an inline file and read records from the same. For instance, "
-          + "for HFileDataBlock, a inline file will be read using HFileReader.");
-
   public static final ConfigProperty<Boolean> ENABLE_FULL_SCAN_LOG_FILES = ConfigProperty
       .key(METADATA_PREFIX + ".enable.full.scan.log.files")
       .defaultValue(true)
       .sinceVersion("0.10.0")
       .withDocumentation("Enable full scanning of log files while reading log records. If disabled, hudi does look up of only interested entries.");
+
+  public static final ConfigProperty<Boolean> POPULATE_META_FIELDS = ConfigProperty
+      .key(METADATA_PREFIX + ".populate.meta.fields")
+      .defaultValue(true)
+      .sinceVersion("0.10.0")
+      .withDocumentation("When enabled, populates all meta fields. When disabled, no meta fields are populated.");
+
+  public static final ConfigProperty<Boolean> IGNORE_SPURIOUS_DELETES = ConfigProperty
+      .key("_" + METADATA_PREFIX + ".ignore.spurious.deletes")
+      .defaultValue(true)
+      .sinceVersion("0.10.10")
+      .withDocumentation("There are cases when extra files are requested to be deleted from metadata table which was never added before. This config"
+          + "determines how to handle such spurious deletes");
 
   private HoodieMetadataConfig() {
     super();
@@ -162,6 +167,14 @@ public final class HoodieMetadataConfig extends HoodieConfig {
 
   public boolean enableFullScan() {
     return getBoolean(ENABLE_FULL_SCAN_LOG_FILES);
+  }
+
+  public boolean populateMetaFields() {
+    return getBooleanOrDefault(HoodieMetadataConfig.POPULATE_META_FIELDS);
+  }
+
+  public boolean ignoreSpuriousDeletes() {
+    return getBoolean(IGNORE_SPURIOUS_DELETES);
   }
 
   public static class Builder {
@@ -206,6 +219,11 @@ public final class HoodieMetadataConfig extends HoodieConfig {
       return this;
     }
 
+    public Builder withPopulateMetaFields(boolean populateMetaFields) {
+      metadataConfig.setValue(POPULATE_META_FIELDS, Boolean.toString(populateMetaFields));
+      return this;
+    }
+
     public Builder archiveCommitsWith(int minToKeep, int maxToKeep) {
       metadataConfig.setValue(MIN_COMMITS_TO_KEEP, String.valueOf(minToKeep));
       metadataConfig.setValue(MAX_COMMITS_TO_KEEP, String.valueOf(maxToKeep));
@@ -234,6 +252,11 @@ public final class HoodieMetadataConfig extends HoodieConfig {
 
     public Builder enableFullScan(boolean enableFullScan) {
       metadataConfig.setValue(ENABLE_FULL_SCAN_LOG_FILES, String.valueOf(enableFullScan));
+      return this;
+    }
+
+    public Builder ignoreSpuriousDeletes(boolean validateMetadataPayloadConsistency) {
+      metadataConfig.setValue(IGNORE_SPURIOUS_DELETES, String.valueOf(validateMetadataPayloadConsistency));
       return this;
     }
 

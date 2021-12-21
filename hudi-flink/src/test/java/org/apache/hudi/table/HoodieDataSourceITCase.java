@@ -243,6 +243,28 @@ public class HoodieDataSourceITCase extends AbstractTestBase {
   }
 
   @Test
+  void testStreamWriteReadSkippingCompaction() throws Exception {
+    // create filesystem table named source
+    String createSource = TestConfigurations.getFileSourceDDL("source");
+    streamTableEnv.executeSql(createSource);
+
+    String hoodieTableDDL = sql("t1")
+        .option(FlinkOptions.PATH, tempFile.getAbsolutePath())
+        .option(FlinkOptions.TABLE_TYPE, FlinkOptions.TABLE_TYPE_MERGE_ON_READ)
+        .option(FlinkOptions.READ_AS_STREAMING, true)
+        .option(FlinkOptions.READ_STREAMING_SKIP_COMPACT, true)
+        .option(FlinkOptions.COMPACTION_DELTA_COMMITS, 1)
+        .option(FlinkOptions.COMPACTION_TASKS, 1)
+        .end();
+    streamTableEnv.executeSql(hoodieTableDDL);
+    String insertInto = "insert into t1 select * from source";
+    execInsertSql(streamTableEnv, insertInto);
+
+    List<Row> rows = execSelectSql(streamTableEnv, "select * from t1", 10);
+    assertRowsEquals(rows, TestData.DATA_SET_SOURCE_INSERT_LATEST_COMMIT);
+  }
+
+  @Test
   void testStreamWriteWithCleaning() {
     // create filesystem table named source
 
@@ -424,6 +446,8 @@ public class HoodieDataSourceITCase extends AbstractTestBase {
     String hoodieTableDDL = sql("t1")
         .option(FlinkOptions.PATH, tempFile.getAbsolutePath())
         .option(FlinkOptions.TABLE_NAME, tableType.name())
+        .option("hoodie.parquet.small.file.limit", "0") // invalidate the small file strategy
+        .option("hoodie.parquet.max.file.size", "0")
         .noPartition()
         .end();
     tableEnv.executeSql(hoodieTableDDL);
@@ -961,8 +985,9 @@ public class HoodieDataSourceITCase extends AbstractTestBase {
         + "+I[id8, Han, 56, 1970-01-01T00:00:08, par4]]");
   }
 
-  @Test
-  void testWriteReadDecimals() {
+  @ParameterizedTest
+  @ValueSource(strings = {"bulk_insert", "upsert"})
+  void testWriteReadDecimals(String operation) {
     TableEnvironment tableEnv = batchTableEnv;
     String createTable = sql("decimals")
         .field("f0 decimal(3, 2)")
@@ -970,7 +995,7 @@ public class HoodieDataSourceITCase extends AbstractTestBase {
         .field("f2 decimal(20, 2)")
         .field("f3 decimal(38, 18)")
         .option(FlinkOptions.PATH, tempFile.getAbsolutePath())
-        .option(FlinkOptions.OPERATION, "bulk_insert")
+        .option(FlinkOptions.OPERATION, operation)
         .option(FlinkOptions.PRECOMBINE_FIELD, "f1")
         .pkField("f0")
         .noPartition()

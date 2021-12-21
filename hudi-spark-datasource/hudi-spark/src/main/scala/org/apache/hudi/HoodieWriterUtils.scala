@@ -22,7 +22,7 @@ import java.util.Properties
 import org.apache.hudi.DataSourceOptionsHelper.allAlternatives
 import org.apache.hudi.DataSourceWriteOptions._
 import org.apache.hudi.common.config.HoodieMetadataConfig.ENABLE
-import org.apache.hudi.common.config.{HoodieConfig, TypedProperties}
+import org.apache.hudi.common.config.{DFSPropertiesConfiguration, HoodieConfig, TypedProperties}
 import org.apache.hudi.common.table.HoodieTableConfig
 import org.apache.hudi.exception.HoodieException
 import org.apache.spark.sql.SparkSession
@@ -47,41 +47,44 @@ object HoodieWriterUtils {
     * @return
     */
   def parametersWithWriteDefaults(parameters: Map[String, String]): Map[String, String] = {
-    Map(OPERATION.key -> OPERATION.defaultValue,
-      TABLE_TYPE.key -> TABLE_TYPE.defaultValue,
-      PRECOMBINE_FIELD.key -> PRECOMBINE_FIELD.defaultValue,
-      PAYLOAD_CLASS_NAME.key -> PAYLOAD_CLASS_NAME.defaultValue,
-      RECORDKEY_FIELD.key -> RECORDKEY_FIELD.defaultValue,
-      PARTITIONPATH_FIELD.key -> PARTITIONPATH_FIELD.defaultValue,
-      KEYGENERATOR_CLASS_NAME.key -> DEFAULT_KEYGENERATOR_CLASS_OPT_VAL,
-      ENABLE.key -> ENABLE.defaultValue.toString,
-      COMMIT_METADATA_KEYPREFIX.key -> COMMIT_METADATA_KEYPREFIX.defaultValue,
-      INSERT_DROP_DUPS.key -> INSERT_DROP_DUPS.defaultValue,
-      STREAMING_RETRY_CNT.key -> STREAMING_RETRY_CNT.defaultValue,
-      STREAMING_RETRY_INTERVAL_MS.key -> STREAMING_RETRY_INTERVAL_MS.defaultValue,
-      STREAMING_IGNORE_FAILED_BATCH.key -> STREAMING_IGNORE_FAILED_BATCH.defaultValue,
-      META_SYNC_CLIENT_TOOL_CLASS_NAME.key -> META_SYNC_CLIENT_TOOL_CLASS_NAME.defaultValue,
-      HIVE_SYNC_ENABLED.key -> HIVE_SYNC_ENABLED.defaultValue,
-      META_SYNC_ENABLED.key -> META_SYNC_ENABLED.defaultValue,
-      HIVE_DATABASE.key -> HIVE_DATABASE.defaultValue,
-      HIVE_TABLE.key -> HIVE_TABLE.defaultValue,
-      HIVE_BASE_FILE_FORMAT.key -> HIVE_BASE_FILE_FORMAT.defaultValue,
-      HIVE_USER.key -> HIVE_USER.defaultValue,
-      HIVE_PASS.key -> HIVE_PASS.defaultValue,
-      HIVE_URL.key -> HIVE_URL.defaultValue,
-      HIVE_PARTITION_FIELDS.key -> HIVE_PARTITION_FIELDS.defaultValue,
-      HIVE_PARTITION_EXTRACTOR_CLASS.key -> HIVE_PARTITION_EXTRACTOR_CLASS.defaultValue,
-      HIVE_STYLE_PARTITIONING.key -> HIVE_STYLE_PARTITIONING.defaultValue,
-      HIVE_USE_JDBC.key -> HIVE_USE_JDBC.defaultValue,
-      HIVE_CREATE_MANAGED_TABLE.key() -> HIVE_CREATE_MANAGED_TABLE.defaultValue.toString,
-      HIVE_SYNC_AS_DATA_SOURCE_TABLE.key() -> HIVE_SYNC_AS_DATA_SOURCE_TABLE.defaultValue(),
-      ASYNC_COMPACT_ENABLE.key -> ASYNC_COMPACT_ENABLE.defaultValue,
-      INLINE_CLUSTERING_ENABLE.key -> INLINE_CLUSTERING_ENABLE.defaultValue,
-      ASYNC_CLUSTERING_ENABLE.key -> ASYNC_CLUSTERING_ENABLE.defaultValue,
-      ENABLE_ROW_WRITER.key -> ENABLE_ROW_WRITER.defaultValue,
-      RECONCILE_SCHEMA.key -> RECONCILE_SCHEMA.defaultValue.toString,
-      DROP_PARTITION_COLUMNS.key -> DROP_PARTITION_COLUMNS.defaultValue
-    ) ++ DataSourceOptionsHelper.translateConfigurations(parameters)
+    val globalProps = DFSPropertiesConfiguration.getGlobalProps.asScala
+    val props = new Properties()
+    props.putAll(parameters)
+    val hoodieConfig: HoodieConfig = new HoodieConfig(props)
+    hoodieConfig.setDefaultValue(OPERATION)
+    hoodieConfig.setDefaultValue(TABLE_TYPE)
+    hoodieConfig.setDefaultValue(PRECOMBINE_FIELD)
+    hoodieConfig.setDefaultValue(PAYLOAD_CLASS_NAME)
+    hoodieConfig.setDefaultValue(RECORDKEY_FIELD)
+    hoodieConfig.setDefaultValue(KEYGENERATOR_CLASS_NAME)
+    hoodieConfig.setDefaultValue(ENABLE)
+    hoodieConfig.setDefaultValue(COMMIT_METADATA_KEYPREFIX)
+    hoodieConfig.setDefaultValue(INSERT_DROP_DUPS)
+    hoodieConfig.setDefaultValue(STREAMING_RETRY_CNT)
+    hoodieConfig.setDefaultValue(STREAMING_RETRY_INTERVAL_MS)
+    hoodieConfig.setDefaultValue(STREAMING_IGNORE_FAILED_BATCH)
+    hoodieConfig.setDefaultValue(META_SYNC_CLIENT_TOOL_CLASS_NAME)
+    hoodieConfig.setDefaultValue(HIVE_SYNC_ENABLED)
+    hoodieConfig.setDefaultValue(META_SYNC_ENABLED)
+    hoodieConfig.setDefaultValue(HIVE_DATABASE)
+    hoodieConfig.setDefaultValue(HIVE_TABLE)
+    hoodieConfig.setDefaultValue(HIVE_BASE_FILE_FORMAT)
+    hoodieConfig.setDefaultValue(HIVE_USER)
+    hoodieConfig.setDefaultValue(HIVE_PASS)
+    hoodieConfig.setDefaultValue(HIVE_URL)
+    hoodieConfig.setDefaultValue(HIVE_PARTITION_FIELDS)
+    hoodieConfig.setDefaultValue(HIVE_PARTITION_EXTRACTOR_CLASS)
+    hoodieConfig.setDefaultValue(HIVE_STYLE_PARTITIONING)
+    hoodieConfig.setDefaultValue(HIVE_USE_JDBC)
+    hoodieConfig.setDefaultValue(HIVE_CREATE_MANAGED_TABLE)
+    hoodieConfig.setDefaultValue(HIVE_SYNC_AS_DATA_SOURCE_TABLE)
+    hoodieConfig.setDefaultValue(ASYNC_COMPACT_ENABLE)
+    hoodieConfig.setDefaultValue(INLINE_CLUSTERING_ENABLE)
+    hoodieConfig.setDefaultValue(ASYNC_CLUSTERING_ENABLE)
+    hoodieConfig.setDefaultValue(ENABLE_ROW_WRITER)
+    hoodieConfig.setDefaultValue(RECONCILE_SCHEMA)
+    hoodieConfig.setDefaultValue(DROP_PARTITION_COLUMNS)
+    Map() ++ hoodieConfig.getProps.asScala ++ globalProps ++ DataSourceOptionsHelper.translateConfigurations(parameters)
   }
 
   def toProperties(params: Map[String, String]): TypedProperties = {
@@ -169,5 +172,24 @@ object HoodieWriterUtils {
         tableConfig.getString(key)
       }
     }
+  }
+
+  val sparkDatasourceConfigsToTableConfigsMap = Map(
+    TABLE_NAME -> HoodieTableConfig.NAME,
+    TABLE_TYPE -> HoodieTableConfig.TYPE,
+    PRECOMBINE_FIELD -> HoodieTableConfig.PRECOMBINE_FIELD,
+    PARTITIONPATH_FIELD -> HoodieTableConfig.PARTITION_FIELDS,
+    RECORDKEY_FIELD -> HoodieTableConfig.RECORDKEY_FIELDS,
+    PAYLOAD_CLASS_NAME -> HoodieTableConfig.PAYLOAD_CLASS_NAME
+  )
+  def mappingSparkDatasourceConfigsToTableConfigs(options: Map[String, String]): Map[String, String] = {
+    val includingTableConfigs = scala.collection.mutable.Map() ++ options
+    sparkDatasourceConfigsToTableConfigsMap.foreach(kv => {
+      if (options.containsKey(kv._1.key)) {
+        includingTableConfigs(kv._2.key) = options(kv._1.key)
+        includingTableConfigs.remove(kv._1.key)
+      }
+    })
+    includingTableConfigs.toMap
   }
 }
