@@ -9,6 +9,6 @@ deploy:
   tags:
   - maven
   only:
-  - release-0.10.0-qihoo.3@big-data/hudi
+  - release-0.10.0-qihoo.4@big-data/hudi
   script:
   - mvn clean deploy -DskipTests -Pspark3 -Pflink-bundle-shade-hive2
